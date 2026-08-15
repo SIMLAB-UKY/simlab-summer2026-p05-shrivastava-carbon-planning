@@ -8,21 +8,28 @@ import pandas as pd
 import json, os
 
 np.random.seed(42)
-OUT = r"D:\ML+DL\simlab-summer2026-p05-shrivastava-carbon-planning\GNN-Based Mine Haulage Prediction\intern_05_gnn_cycle_time\new_data"
+OUT = r"D:\ML+DL\simlab-summer2026-p05-shrivastava-carbon-planning\GNN-Based Mine Haulage Prediction\intern_05_gnn_cycle_time\data"
 
-# ── NODES: shovels, dumps, crusher, intersections ─────────────────────────────
+# ── EXPANDED NODES (20 Nodes) ─────────────────────────────
 nodes = [
-    # id, type, x, y, elevation_m, capacity_tph (shovels only), queue_capacity
     ("S1","shovel",      200, 700,  80, 600, 3),
     ("S2","shovel",      400, 650,  95, 700, 3),
     ("S3","shovel",      600, 680, 110, 550, 3),
     ("S4","shovel",      800, 710, 125, 650, 3),
+    ("S5","shovel",      250, 850,  90, 600, 3), # NEW
+    ("S6","shovel",      750, 850, 130, 650, 3), # NEW
     ("I1","intersection",300, 500,  70,   0, 0),
     ("I2","intersection",500, 480,  75,   0, 0),
     ("I3","intersection",700, 460,  85,   0, 0),
     ("I4","intersection",450, 300,  50,   0, 0),
-    ("CR","crusher",     100, 100,  20, 1800, 4),
-    ("D2","waste_dump",  900, 120,  30,    0, 4),
+    ("I5","intersection",350, 600,  80,   0, 0), # NEW
+    ("I6","intersection",650, 600,  95,   0, 0), # NEW
+    ("I7","intersection",500, 200,  40,   0, 0), # NEW
+    ("I8","intersection",700, 250,  45,   0, 0), # NEW
+    ("CR1","crusher",    100, 100,  20, 1800, 4),
+    ("CR2","crusher",    900, 200,  25, 1500, 4), # NEW
+    ("D1","waste_dump",  150, 250,  35,   0, 4), # NEW
+    ("D2","waste_dump",  900, 120,  30,   0, 4),
 ]
 df_nodes = pd.DataFrame(nodes, columns=[
     "node_id","node_type","x","y","elevation_m","capacity_tph","queue_capacity"])
@@ -43,10 +50,17 @@ def gradient(a, b):
     d = dist(a,b)*1000
     return round((nb.elevation_m - na.elevation_m) / d * 100, 2) if d>0 else 0
 
+# ── EXPANDED EDGES (24 undirected = 48 directed arcs) ─────────────────────────────
 edge_list = [
+    # Original core
     ("S1","I1"),("S2","I1"),("S2","I2"),("S3","I2"),("S3","I3"),("S4","I3"),
-    ("I1","I4"),("I2","I4"),("I3","I4"),
-    ("I4","CR"),("I3","D2"),("I4","D2"),
+    ("I1","I4"),("I2","I4"),("I3","I4"), ("I4","CR1"),("I3","D2"),("I4","D2"),
+    # New North/West complex
+    ("S5","I5"),("I5","I1"),("S1","I5"),("I5","D1"),("I1","D1"),
+    # New North/East complex
+    ("S6","I6"),("I6","I3"),("S4","I6"),
+    # New South/East Crusher routing
+    ("I3","I8"),("I4","I7"),("I7","I8"),("I8","CR2"),("I8","D2"),("I7","CR1")
 ]
 edges = []
 surface_opts = ["good","fair","poor"]
@@ -83,30 +97,40 @@ df_edges.to_csv(f"{OUT}/graph_edges.csv", index=False)
 surface_factor = {"good":1.0, "fair":1.15, "poor":1.35}
 
 # Define routes: shovel -> crusher (loaded) and crusher -> shovel (empty), plus waste routes
+# ── EXPANDED ROUTES ─────────────────────────────
 routes = {
-    "S1_CR": ["S1_I1","I1_I4","I4_CR"], "CR_S1": ["CR_I4","I4_I1","I1_S1"],
-    "S2_CR": ["S2_I1","I1_I4","I4_CR"], "CR_S2": ["CR_I4","I4_I1","I1_S2"],
-    "S3_CR": ["S3_I2","I2_I4","I4_CR"], "CR_S3": ["CR_I4","I4_I2","I2_S3"],
-    "S4_CR": ["S4_I3","I3_I4","I4_CR"], "CR_S4": ["CR_I4","I4_I3","I3_S4"],
-    "S3_D2": ["S3_I3","I3_D2"],          "D2_S3": ["D2_I3","I3_S3"],
-    "S4_D2": ["S4_I3","I3_D2"],          "D2_S4": ["D2_I3","I3_S4"],
+    # CR1 routes
+    "S1_CR1": ["S1_I1","I1_I4","I4_CR1"], "CR1_S1": ["CR1_I4","I4_I1","I1_S1"],
+    "S2_CR1": ["S2_I1","I1_I4","I4_CR1"], "CR1_S2": ["CR1_I4","I4_I1","I1_S2"],
+    "S3_CR1": ["S3_I2","I2_I4","I4_CR1"], "CR1_S3": ["CR1_I4","I4_I2","I2_S3"],
+    "S5_CR1": ["S5_I5","I5_I1","I1_I4","I4_CR1"], "CR1_S5": ["CR1_I4","I4_I1","I1_I5","I5_S5"],
+    # CR2 routes
+    "S3_CR2": ["S3_I3","I3_I8","I8_CR2"], "CR2_S3": ["CR2_I8","I8_I3","I3_S3"],
+    "S4_CR2": ["S4_I3","I3_I8","I8_CR2"], "CR2_S4": ["CR2_I8","I8_I3","I3_S4"],
+    "S6_CR2": ["S6_I6","I6_I3","I3_I8","I8_CR2"], "CR2_S6": ["CR2_I8","I8_I3","I3_I6","I6_S6"],
+    # Dumps
+    "S3_D2": ["S3_I3","I3_D2"], "D2_S3": ["D2_I3","I3_S3"],
+    "S4_D2": ["S4_I3","I3_D2"], "D2_S4": ["D2_I3","I3_S4"],
+    "S1_D1": ["S1_I5","I5_D1"], "D1_S1": ["D1_I5","I5_S1"],
+    "S5_D1": ["S5_I5","I5_D1"], "D1_S5": ["D1_I5","I5_S5"],
 }
 edge_lookup = df_edges.set_index("edge_id").to_dict("index")
 
-N_OBS = 4800
+N_OBS = 10000
 rows = []
 truck_ids = [f"T{i+1:02d}" for i in range(10)]
 
 for i in range(N_OBS):
     route_name = np.random.choice(list(routes.keys()))
     edge_seq   = routes[route_name]
-    loaded     = route_name.split("_")[1] in ("CR","D2")   # heading to dump = loaded
+    # The Fix
+    loaded = route_name.split("_")[1] in ("CR1", "CR2", "D1", "D2")   # heading to dump = loaded
     payload_t  = round(np.clip(np.random.normal(195,15),100,220),1) if loaded else 0.0
     shift_hour = round(np.random.uniform(0,12),2)
     # congestion: peaks mid-shift (hours 4-8), Poisson queue at intersections
     congestion = np.clip(np.random.poisson(2 + 2*np.exp(-((shift_hour-6)**2)/4)),0,8)
     # node failure flag: 6% of observations have an active failure upstream
-    failure_active = int(np.random.rand() < 0.06)
+    failure_active = int(np.random.rand() < 0.20)
 
     total_time = 0.0
     total_dist = 0.0

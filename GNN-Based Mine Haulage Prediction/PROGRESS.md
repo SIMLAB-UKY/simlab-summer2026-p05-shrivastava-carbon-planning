@@ -28,3 +28,9 @@
 - [x] Filtered test set to evaluate predictions exclusively during held-out active mine outages.
 - [x] Generated comparative boxplots (Loaded/Empty/Combined), proving that failure-aware routing drastically condenses error variance.
 - [x] Benchmarked final outage metrics: Nominal GNN (374.98s) vs. Failure-Aware GNN (223.46s), yielding a net improvement of 151.52s.
+
+## Week 5 Updates
+- [x] Implemented a 10-model GNN ensemble with randomized seed initializations to capture epistemic uncertainty.
+- [x] Configured ensemble aggregation (mean for final routing prediction, standard deviation for operational confidence).
+- [x] Built regression calibration pipeline and computed Expected Calibration Error (ECE: 56.29s).
+- [x] Generated uncertainty vs. actual error calibration plots, proving strong linear correspondence and model self-awareness during active mine outages.
